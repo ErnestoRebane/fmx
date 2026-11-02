@@ -1,0 +1,22 @@
+# FELUCCA target cost budget (tests/target_budget.py): instructions in the loops of each
+# function in build/felucca.dis, x4 per nesting level, divides x9. The check allows +10 %.
+# Rewritten by BUDGET_UPDATE=1.
+# 2026-10-26, the CHOP's INST melody (chopgen.c, its own noinline cs_tick; its buffers in .pool): mix_units 15361 from
+# 13487 with 16 instructions fewer (1428 -> 1412) and the same calls and divides - the loops' layout, not more work
+# (HEAD's and this build's listings compared; the host CPU check unchanged).
+# 2026-10-28, the CHOP's INST leads (docs/leads.md): analog_lead, the HOOV / SYNC / FM oscillators, its own noinline like
+# analog_sub (a voice runs one of analog_render, analog_sub, analog_lead); analog_render 664, unchanged.
+# 2026-10-29, SYNC without aliasing (Braids' two-sample BLEP on the slave's reset and wrap): analog_lead 904 from 700,
+# the SYNC branch's code (+~80 loop instructions, counted for every wave) while the 64-bit divide per master wrap
+# and the slave's polyBLEP divides are gone: per SYNC sample cheaper, 1.16 vs 1.32 ns on the Mac (tests/sync_proto.c).
+# 2026-10-29, the chorus bus as an ensemble (fx.c FX_ENSEMBLE, after Plaits): fm1_alnk0_irq 8979 from 8623, a third
+# tap a sample and six sines a block instead of two (tests/ensemble_proto.sh).
+# 2026-10-29, DUST without the buzz (fx.c FX_DUST_BLEP, after Plaits' sample_rate_reducer): fm1_alnk0_irq 9281 from
+# 8979, the drive's soft clip on every sample instead of every held one, and a step's BLEP (tests/dust_ab.sh).
+analog_render 667
+analog_sub 107
+analog_lead 904
+sample_render 188
+slicer_track 832
+mix_units 15361
+fm1_alnk0_irq 9281

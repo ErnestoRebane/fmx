@@ -1,0 +1,6 @@
+build/
+.DS_Store
+__pycache__/
+
+# KAN Samples "Amen Break Tribute" cuts: licensed to the user only, never published (tests/fixtures/README.md)
+tests/fixtures/kan/

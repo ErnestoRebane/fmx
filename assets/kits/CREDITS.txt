@@ -1,0 +1,6 @@
+Recorded CHOP kits, prepared by tools/prep_kit.py (mono, the silence before each hit cut, tails trimmed, 11025 Hz).
+
+ANIME  "Character Voice" pack by lemonjolly, freesound.org, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/):
+       sounds 273742, 273743, 273746, 273921, 273922, 273924, 273925, 273928, 273929, 275338, 275339, 275342,
+       275345 (https://freesound.org/s/<number>/), in that order from F3 up. Trimmed and resampled.
+       (The licence was read on the pages of 273742 and 275338; check the others before a release.)

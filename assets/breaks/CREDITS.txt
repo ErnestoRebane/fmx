@@ -1,0 +1,27 @@
+FMX's built-in break loops (FMX_OWN in tools/gen_samples.py), built into the firmware at 16 kHz IMA ADPCM.
+
+"Jungle Breaks" pack by OaSyntax, freesound.org (https://freesound.org/people/OaSyntax/packs/5130/),
+CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Renamed, resampled to 16 kHz and ADPCM-encoded for the firmware.
+The licence was read on each sound's page on 2026-10-21.
+
+  AMEN_A.wav   78886  170_amen_A_.wav
+  AMEN_B.wav   78887  170_amen_B.wav
+  THNK.wav     78884  160_think.wav
+  FNKDR.wav    78888  170_funky_drummer.wav
+  APCH.wav     78881  160_apache.wav
+  ACTN.wav     78885  170_action.wav
+  DTD.wav      78882  160_do_the_do.wav
+  HLCP.wav     78889  170_helicopter.wav
+  HT_PNTS.wav  78890  170_hot_pants.wav
+  PLP_FC.wav   78891  170_pulp_fiction.wav
+  SCRP_A.wav   78892  170_scorpio_A.wav
+  SCRP_B.wav   78893  170_scorpio_B.wav
+  TRMN.wav     78894  170_tramen.wav
+  WMN.wav      78883  160_the_worm.wav
+
+(https://freesound.org/s/<number>/)
+
+The CC licence covers OaSyntax's cuts. The underlying drum breaks come from commercial records (the Amen from the
+Winstons' "Amen, Brother", "Think" from Lyn Collins, "Funky Drummer" from James Brown, and so on), whose rights the
+CC licence does not cover. That is the usual status of breaks in jungle; it is noted here so that redistributors
+know it.

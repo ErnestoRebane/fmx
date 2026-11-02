@@ -1,0 +1,517 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     The FMX companion app: one page for everything the FM-1 needs from a computer: the emulator first (the firmware in this browser, web/app_emu.js), the firmware (install,
+     update, back to the stock V15: web/fm1ota.js), and the sounds on the FM-1 (the sample pool's map and list, adding
+     sounds, the set's songs and its backup, the packs: web/sounds.js, web/app_device.js, web/pool.js). It replaces the
+     installer, the break loops, the slice loops and the emulator pages; web/make_site.py publishes it as the site's
+     index. In the LIVE screen's language: Terminus on the device's 16 px grid, the track colours, AUTO green, Q yellow. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FMX Companion</title>
+<meta name="description" content="FMX, firmware to play jungle live on the M-VAVE FM-1: try it in the browser, install it, and manage the sounds on your FM-1.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Cpath d=%22M8 0 14 6 8 16 2 6Z%22 fill=%22%23ff8a3a%22/%3E%3Cpath d=%22M8 0 14 6H8Z%22 fill=%22%2340dcc8%22/%3E%3C/svg%3E">
+<style>
+/* Terminus (Dimitar Toshkov Zhekov, SIL OFL 1.1, fonts/Terminus-LICENSE.txt): the FM-1's own font, each pixel a square */
+@font-face { font-family: "Terminus"; font-weight: 400; src: url(fonts/terminus-16.woff) format("woff"); }
+@font-face { font-family: "Terminus"; font-weight: 700; src: url(fonts/terminus-16-bold.woff) format("woff"); }
+@font-face { font-family: "Terminus Small"; font-weight: 400; src: url(fonts/terminus-12.woff) format("woff"); }
+@font-face { font-family: "Terminus Big"; font-weight: 700; src: url(fonts/terminus-32-bold.woff) format("woff"); }
+
+:root {
+  --void: #050819;      /* page ground */
+  --navy: #0d1640;      /* panel top, as LIVE's header */
+  --navy-2: #08102c;    /* panel bottom */
+  --rule: #4c5c9e;      /* panel and box lines */
+  --ink: #eef1ff;
+  --dim: #8890b6;
+  --sel: #2847a8;       /* LIVE's selected row */
+  --go: #5fe08a;        /* AUTO green: done, connected */
+  --wait: #ffd447;      /* Q yellow: pending, waits for you */
+  --bad: #ff6a5a;
+  --brk: #ff8a3a; --bass: #4a8cff; --chd: #40dcc8; --chop: #ff78aa; --kit: #b28cff; --mel: #d4f05a;
+  --px: "Terminus", ui-monospace, Menlo, monospace;
+  --big: "Terminus Big", "Terminus", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html { background: var(--void); scroll-behavior: smooth; }
+body { margin: 0; background: var(--void); color: var(--ink); font: 400 16px/24px var(--px); -webkit-font-smoothing: none;
+       font-smooth: never; text-rendering: optimizeSpeed; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--navy-2); }
+* { box-sizing: border-box; }
+a { color: inherit; }
+h1, h2, h3, p { margin: 0; }
+h2 { font: 700 32px/32px var(--big); letter-spacing: 0; text-wrap: balance; }
+h3 { font: 700 16px/24px var(--px); letter-spacing: .5px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.dim { color: var(--dim); }
+.num { font-variant-numeric: tabular-nums; }
+.bad { color: var(--bad); }
+.ok { color: var(--go); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--wait); outline-offset: 2px; }
+
+/* the boxes: LIVE's AUTO / Q NOW buttons */
+.btn { font: 700 16px/24px var(--px); color: var(--ink); background: transparent; border: 2px solid var(--rule);
+       padding: 6px 14px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.btn:hover { background: var(--sel); border-color: var(--sel); }
+.btn.go { color: var(--void); background: var(--go); border-color: var(--go); }
+.btn.go:hover { background: #8af0ac; border-color: #8af0ac; }
+.btn.wait { color: var(--wait); border-color: var(--wait); }
+.btn.wait:hover { color: var(--void); background: var(--wait); }
+.btn.small { padding: 0 8px; border-width: 1px; font-weight: 400; }
+.btn:disabled, .btn:disabled:hover { opacity: .4; cursor: default; background: transparent; border-color: var(--rule); color: var(--ink); }
+.chip { display: inline-block; padding: 0 6px; border: 1px solid currentColor; line-height: 20px; white-space: nowrap; }
+select { font: inherit; color: var(--ink); background: var(--navy-2); border: 1px solid var(--rule); padding: 0 4px; }
+select.chip { color: inherit; background: transparent; padding: 0 4px; cursor: pointer; }
+select.chip option { color: var(--ink); background: var(--navy-2); }
+.row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.bar { height: 8px; background: #1a2350; }
+.bar i { display: block; height: 100%; width: 0; background: var(--wait); }
+.status { min-height: 24px; }
+
+/* header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: linear-gradient(var(--navy), var(--navy-2));
+             border-bottom: 1px solid var(--rule); }
+header.top .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; padding-block: 8px; }
+.logo { font: 700 32px/32px var(--big); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+.logo canvas { width: 32px; height: 32px; image-rendering: pixelated; }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+nav.tabs a { text-decoration: none; padding: 2px 10px; }
+nav.tabs a:hover, nav.tabs a[aria-current] { background: var(--sel); }
+.dev { display: flex; align-items: center; gap: 10px; }
+.ua { color: var(--dim); white-space: nowrap; }
+@media (max-width: 560px) { header.top { position: static; } nav.tabs a { padding: 2px 6px; } }   /* (three lines tall there: not over the page) */
+.dot { width: 8px; height: 8px; background: var(--go); display: inline-block; }
+body.offline .dot { background: var(--dim); }
+body.busy .dot { background: var(--wait); }
+
+/* hero */
+.hero { padding-block: 32px 24px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: center; }
+@media (max-width: 860px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.scene { position: relative; border: 1px solid var(--rule); background: var(--void); aspect-ratio: 16 / 9; max-width: 100%; }
+.scene canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.pitch { display: grid; gap: 16px; min-width: 0; }
+.eyebrow { color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+.pitch h1 { font: 700 64px/64px var(--big); text-wrap: balance; }
+@media (max-width: 520px) { .pitch h1 { font-size: 32px; line-height: 32px; } }
+.tracks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.tracks b { font-weight: 700; }
+
+/* the doors */
+.doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-bottom: 40px; }
+@media (max-width: 760px) { .doors { grid-template-columns: minmax(0, 1fr); } }
+.door { display: grid; gap: 4px; text-decoration: none; padding: 12px 14px; border: 1px solid var(--rule);
+        background: linear-gradient(var(--navy), var(--navy-2)); }
+.door:hover { border-color: var(--ink); }
+.door .k { color: var(--dim); }
+.door .v { font: 700 32px/32px var(--big); }
+.door .s { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+/* panels */
+section.panel { padding-block: 24px 40px; border-top: 1px solid var(--rule); scroll-margin-top: 64px; }
+.head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+.head p { max-width: 62ch; }
+.box { border: 1px solid var(--rule); background: linear-gradient(var(--navy), var(--navy-2)); padding: 14px 16px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.box > h3, .box h3.cap { color: var(--dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 400; }
+.cols { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.cols.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 860px) { .cols, .cols.even { grid-template-columns: minmax(0, 1fr); } }
+body.offline [data-device], body.nopool [data-pool], body.offline [data-pool] { opacity: .35; pointer-events: none; }
+body.busy [data-device], body.busy [data-pool] { pointer-events: none; }
+.offline-note { display: none; color: var(--wait); }
+body.offline .offline-note.off, body.nopool:not(.offline) .offline-note.nopool { display: block; }
+
+/* firmware */
+.versions { display: grid; grid-template-columns: auto 1fr; gap: 0 16px; }
+.versions .v { font: 700 32px/40px var(--big); }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; counter-reset: s; }
+@media (max-width: 560px) { .steps { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.steps li { border-top: 4px solid var(--rule); padding-top: 6px; color: var(--dim); counter-increment: s; }
+.steps li::before { content: counter(s) " "; color: var(--ink); }
+.steps li.done { border-color: var(--go); color: var(--ink); }
+.steps li.now { border-color: var(--wait); color: var(--wait); }
+details.log summary { cursor: pointer; color: var(--dim); }
+details.log pre { font: 12px/16px "Terminus Small", var(--px); color: var(--dim); white-space: pre-wrap; max-height: 160px; overflow: auto; margin: 8px 0 0; }
+label.check { display: flex; gap: 8px; align-items: baseline; }
+
+/* the set: songs as save blocks */
+.set { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .set { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.song { border: 1px solid var(--rule); padding: 8px; display: grid; gap: 2px; background: var(--navy-2); }
+.song canvas { width: 32px; height: 32px; image-rendering: pixelated; }
+.song .bpm { font: 700 32px/32px var(--big); }
+.song.empty { border-style: dashed; color: var(--dim); }
+
+/* the pool map */
+.map { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; }
+.cell { aspect-ratio: 1; border: 1px solid #26305e; background: transparent; padding: 0; cursor: pointer; max-width: 100%; }
+.cell[data-t] { border-color: transparent; }
+.cell.hi { outline: 2px solid var(--ink); outline-offset: -1px; }
+.cell.ghost { background: repeating-linear-gradient(135deg, var(--wait) 0 2px, transparent 2px 4px); border-color: var(--wait); }
+.gapline { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--dim); }
+.gapline::before, .gapline::after { content: ""; flex: 1; border-top: 1px dashed var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); }
+.seg button { font: inherit; color: var(--dim); background: none; border: 0; padding: 0 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--sel); color: var(--ink); }
+
+table.pool { width: 100%; border-collapse: collapse; }
+.tablewrap { overflow-x: auto; }
+table.pool th { text-align: left; color: var(--dim); font-weight: 400; padding: 0 8px 4px 0; white-space: nowrap; }
+table.pool td { padding: 2px 8px 2px 0; white-space: nowrap; vertical-align: middle; }
+table.pool tr.hi td { background: var(--sel); }
+table.pool tbody tr { cursor: pointer; }
+table.pool td.r, table.pool th.r { text-align: right; }
+table.pool tr.sub td { color: var(--dim); padding-top: 12px; cursor: default; }
+table.pool td.acts { text-align: right; }
+table.pool td.acts .btn + .btn { margin-left: 4px; }
+.sw { display: inline-block; width: 10px; height: 10px; margin-right: 8px; }
+.only { color: var(--wait); }
+
+/* adding sounds */
+.drop { border: 2px dashed var(--rule); padding: 16px; text-align: center; color: var(--dim); }
+.drop.over { border-color: var(--wait); color: var(--wait); }
+.drop b { color: var(--ink); }
+.file { border: 1px solid var(--rule); background: var(--navy-2); padding: 12px; display: grid; gap: 8px; margin-top: 8px; }
+.file .name { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+.file .name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.file canvas { width: 100%; height: 48px; image-rendering: pixelated; display: block; }
+.small { font: 12px/16px "Terminus Small", var(--px); }
+/* a LOOP's lines: the ✕ over each line, on a strip above the loop */
+.slicer { position: relative; }
+.slicer canvas { height: 96px; cursor: pointer; touch-action: none; }
+.slicer .xs { position: relative; height: 18px; }
+.slicer .xs button { position: absolute; top: 0; width: 16px; height: 16px; margin-left: -8px; padding: 0; border: 1px solid var(--rule);
+                     background: var(--navy-2); color: var(--ink); font: 12px/14px "Terminus Small", var(--px); cursor: pointer; }
+.slicer .xs button:hover { background: var(--bad); border-color: var(--bad); color: var(--void); }
+/* a kit: 16 pads, 4 x 4 */
+.kitname { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
+.kitname input { font: 700 16px/22px var(--px); color: var(--ink); background: var(--navy); border: 1px solid var(--rule); padding: 0 6px; width: 10ch; text-transform: uppercase; }
+.pads { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.pad { position: relative; border: 1px solid var(--kit); background: color-mix(in srgb, var(--kit) 18%, var(--navy-2)); padding: 4px 6px; min-height: 52px;
+       display: grid; align-content: space-between; cursor: pointer; min-width: 0; user-select: none; -webkit-user-select: none; }
+.pad .key { font: 12px/16px "Terminus Small", var(--px); color: var(--dim); }
+.pad b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pad.empty { border: 1px dashed var(--rule); background: transparent; color: var(--dim); }
+.pad.empty b { font-weight: 400; }
+.pad.past .key { opacity: .5; }
+.pad.over { outline: 2px solid var(--wait); outline-offset: -1px; }
+.pad:hover { border-color: var(--ink); }
+.pad button { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; padding: 0; border: 0; background: none; color: var(--dim);
+              font: 12px/16px "Terminus Small", var(--px); cursor: pointer; }
+.pad button:hover { color: var(--bad); }
+.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.pack { border: 1px solid var(--rule); padding: 8px; display: grid; gap: 4px; justify-items: start; }
+input[type=file] { display: none; }
+.mels { display: grid; gap: 4px; margin: 8px 0; max-height: 480px; overflow-y: auto; }
+.mel { display: grid; grid-template-columns: auto 9ch minmax(120px, 1fr) auto auto auto auto; gap: 8px; align-items: center;
+       padding: 4px 0; border-bottom: 1px solid var(--rule); }
+.mel.off { opacity: .45; }
+.mel input[type=text] { font: 400 16px/24px var(--px); color: var(--ink); background: transparent; border: 1px solid var(--rule);
+                        width: 9ch; padding: 0 4px; text-transform: uppercase; }
+.mel canvas { width: 100%; height: 40px; image-rendering: pixelated; background: var(--navy-2); }
+.mel .bars { white-space: nowrap; }
+.mel select { max-width: 16ch; }
+@media (max-width: 720px) { .mel { grid-template-columns: auto 9ch 1fr auto; } .mel canvas { grid-column: 1 / -1; order: 9; } }
+
+/* emulator */
+.fm1 { position: relative; max-width: 1000px; margin: 0 auto; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.fm1 #fm1 { width: 100%; display: block; image-rendering: pixelated; }
+.fm1 #live, .fm1 .on { position: absolute; }
+.fm1 #live { image-rendering: auto; background: #000; }   /* shown a little under 1:1: smooth keeps every column of the font */
+.fm1 .on { display: grid; place-content: center; gap: 8px; justify-items: center; text-align: center; background: #000; padding: 8px; z-index: 2; }
+.fm1 .hit { position: absolute; touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fm1 .hit-knob { cursor: ns-resize; border-radius: 50%; }
+.fm1 .hit:focus-visible { outline: 2px solid var(--wait); outline-offset: 0; }
+.fm1 + .cols { margin-top: 16px; }
+/* the labels (app_help.js): each control's job now, the rest dimmed */
+.tipsbar { max-width: 1000px; margin: 0 auto 12px; }
+.tipsbar #tipLine { color: var(--wait); }
+.fm1 .tip { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; pointer-events: none;
+            font: 12px/12px "Terminus Small", var(--px); color: var(--ink); background: rgba(5, 8, 25, .88); padding: 2px 3px;
+            text-align: center; white-space: nowrap; text-transform: uppercase; }
+.fm1 .tip small { display: block; font: inherit; color: var(--wait); text-transform: none; }
+.fm1.tips .hit { background: rgba(5, 8, 25, .55); }
+.fm1.tips .hit.has { background: none; outline: 2px solid var(--wait); outline-offset: -2px; }
+.fm1.tips .hit.has .tip { display: block; }
+.fm1.tips .hit-knob .tip { top: 100%; transform: translate(-50%, 2px); }
+.fm1.tips .hit-key .tip, .fm1.tips .hit-btn .tip { white-space: normal; width: max-content; max-width: calc(100% + 6px); }
+.fm1.tips.narrow .hit-key .tip { writing-mode: vertical-rl; max-width: none; max-height: 100%; white-space: nowrap; }
+.fm1.tips.narrow .hit-key .tip small { display: inline; margin-top: 4px; }
+@media (max-width: 560px) { .fm1 .on .dim { display: none; } .fm1 .on .btn { padding: 2px 8px; } }
+.songs { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+.songs li { display: grid; grid-template-columns: 24px 56px 1fr; gap: 8px; padding: 2px 6px; }
+kbd { font: inherit; border: 1px solid var(--rule); padding: 0 4px; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+
+footer { border-top: 1px solid var(--rule); color: var(--dim); }
+footer .wrap { padding-block: 20px 32px; display: grid; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+<script>window.FMX_META = /*META*/null;</script>
+</head>
+<body class="offline">
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#top"><canvas id="logoGem" width="16" height="16" aria-hidden="true"></canvas>FMX</a>
+    <span class="ua">Made in Ukraine <span role="img" aria-label="the flag of Ukraine">🇺🇦</span></span>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#top" aria-current="page">Home</a>
+      <a href="#emulator">Emulator</a>
+      <a href="#firmware">Firmware</a>
+      <a href="#sounds">Sounds</a>
+    </nav>
+    <div class="dev">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="devText" class="num" aria-live="polite">No FM-1</span>
+      <button class="btn small" id="connect" type="button">Connect</button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div class="scene">
+      <canvas id="hero" width="256" height="144" role="img" aria-label="A low-poly gem in the four track colours spins over a jungle canyon at dusk"></canvas>
+    </div>
+    <div class="pitch">
+      <p class="eyebrow">Firmware for the M-VAVE FM-1</p>
+      <h1>Play jungle live on the FM-1</h1>
+      <p>Four tracks, each with its own generator. Songs flow into each other, so you can plug into a PA and play a set. Free and open source.</p>
+      <div class="tracks" aria-label="The four tracks">
+        <b style="color: var(--brk)">BREAK</b><b style="color: var(--bass)">BASS</b><b style="color: var(--chd)">CHORDS</b><b style="color: var(--chop)">CHOP</b>
+      </div>
+      <div class="row">
+        <a class="btn go" href="#emulator">Try it in the browser</a>
+        <a class="btn" href="#firmware">Install on the FM-1</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap doors">
+    <a class="door" href="#emulator">
+      <span class="k">EMULATOR</span>
+      <span class="v" style="color: var(--chd)" id="doorEmuV">Demo set</span>
+      <span class="s"><span class="dim" id="doorEmuS">4 songs, works on iPhone</span><span>Play →</span></span>
+    </a>
+    <a class="door" href="#firmware">
+      <span class="k">FIRMWARE</span>
+      <span class="v" style="color: var(--wait)" id="doorFwV">FMX</span>
+      <span class="s"><span class="dim" id="doorFwS">connect the FM-1 to compare</span><span id="doorFwA">Install →</span></span>
+    </a>
+    <a class="door" href="#sounds">
+      <span class="k">SOUNDS ON THE FM-1</span>
+      <span class="v num" id="doorSndV">—</span>
+      <span class="s"><span class="dim num" id="doorSndS">connect the FM-1</span><span>Add →</span></span>
+    </a>
+  </div>
+
+  <!-- EMULATOR -->
+  <section class="panel" id="emulator">
+    <div class="wrap">
+      <div class="head">
+        <h2>Emulator</h2>
+        <p class="dim">The real FMX engine, running in this browser. Try FMX before you install it, or hear your sounds before you send them. Works in Safari and on iPhone.</p>
+      </div>
+      <div class="row tipsbar">
+        <label class="check"><input type="checkbox" id="tips"> <span>Show what each control does now</span></label>
+        <span id="tipLine" hidden></span>
+      </div>
+      <div class="fm1" id="fm1wrap">
+        <canvas id="fm1" role="img" aria-label="The FM-1"></canvas>
+        <canvas id="live" width="240" height="240" role="img" aria-label="The FM-1 screen"></canvas>
+        <div class="on" id="onLayer">
+          <button class="btn go" type="button" id="switchOn">Switch on</button>
+          <span class="dim">plays the demo set</span>
+          <span class="bad" id="emuStatus" hidden></span>
+        </div>
+      </div>
+      <div class="cols even">
+        <div class="box">
+          <h3>Demo set</h3>
+          <ol class="songs num" id="songs"></ol>
+          <p class="dim">In LIVE: <kbd>OCT+</kbd> picks the next song, white key 8 the way there (BRIDGE, SWAP, CUT).</p>
+          <div class="row"><button class="btn small" type="button" id="demoAgain">Put the demo set back</button><span class="dim" id="demoStatus"></span></div>
+        </div>
+        <div class="box">
+          <h3>Keys</h3>
+          <div class="keys">
+            <span><kbd>Z</kbd>–<kbd>'</kbd> <kbd>Q</kbd>–<kbd>O</kbd></span><span>the 27 keys</span>
+            <span><kbd>1</kbd>–<kbd>=</kbd></span><span>FX … REC</span>
+            <span><kbd>[</kbd> <kbd>]</kbd></span><span>OCT</span>
+            <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>SELECT</span>
+            <span><kbd>←</kbd> <kbd>→</kbd></span><span>ALGORITHM</span>
+            <span><kbd>Shift</kbd>-click</span><span>holds a button</span>
+          </div>
+          <label class="check"><input type="checkbox" id="mine"> <span>Load my sounds from this browser's library <span class="dim" id="mineNote"></span></span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FIRMWARE -->
+  <section class="panel" id="firmware">
+    <div class="wrap">
+      <div class="head">
+        <h2>Firmware</h2>
+        <p class="dim">Install FMX, update it, or go back to the stock firmware. Keep the FM-1 on USB until it restarts.</p>
+      </div>
+      <p class="offline-note off" id="fwOffline">Connect the FM-1 by USB with Chrome, Edge or Firefox to install.</p>
+      <div class="cols">
+        <div class="box" data-device>
+          <h3>Install</h3>
+          <div class="versions num">
+            <span class="dim">On your FM-1</span><span class="dim">Here</span>
+            <span class="v" id="fwDev">—</span><span class="v" style="color: var(--wait)" id="fwHere">—</span>
+          </div>
+          <p id="fwNote">FMX: the sample pool (as many sounds as fit, not 4 slots), song cards, the FX panel in LIVE.</p>
+          <ol class="steps" aria-label="Install steps" id="steps">
+            <li data-k="pkg">Check the package</li>
+            <li data-k="send">Send it</li>
+            <li data-k="reboot">FM-1 restarts</li>
+            <li data-k="done">FM-1 reports back</li>
+          </ol>
+          <div class="bar" aria-hidden="true"><i id="fwBar"></i></div>
+          <div class="row">
+            <button class="btn go" type="button" id="install" disabled>Install FMX</button>
+            <span class="dim num" id="fwFile"></span>
+          </div>
+          <p class="status num" id="fwStatus" aria-live="polite"></p>
+          <details class="log"><summary>Details</summary><pre id="fwLog"></pre></details>
+        </div>
+        <div class="box">
+          <h3>Back to stock</h3>
+          <p>Get <b>FM-1 V15</b> from <a href="https://www.m-vave.com/download" target="_blank" rel="noopener">m-vave.com</a> (Downloads → PC Firmware → FM-1 V15) and choose its FM-1.fwsc here. The app checks it is the real V15 before it sends anything; the file stays in this browser.</p>
+          <p class="dim">The stock firmware can't open FMX's songs or sounds: back up the set first (Sounds, below), and restore it after you come back to FMX.</p>
+          <label class="check"><input type="checkbox" id="stockSaved"> <span>I backed up my set</span></label>
+          <div class="row" data-device>
+            <button class="btn" type="button" id="stockPick">Choose FM-1.fwsc…</button>
+            <button class="btn wait" type="button" id="stockGo" disabled>Install stock V15</button>
+          </div>
+          <input type="file" id="stockFile" accept=".fwsc">
+          <p class="status" id="stockStatus" aria-live="polite"></p>
+          <h3>If it won't start</h3>
+          <p>Hold <kbd>OCT−</kbd> while you switch the FM-1 on. It starts in USB rescue, and you can install again from here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOUNDS -->
+  <section class="panel" id="sounds">
+    <div class="wrap">
+      <div class="head">
+        <h2>Sounds on the FM-1</h2>
+        <p class="dim">One pool for everything: breaks, slice loops, kits and instruments. The FM-1 sends its list when it connects, so this map is what's on it now.</p>
+      </div>
+      <p class="offline-note off">Connect the FM-1 to see what's on it. Your library in this browser still works.</p>
+      <p class="offline-note nopool">This FM-1's firmware has no sample pool. Install FMX (Firmware, above) to send sounds to it.</p>
+
+      <div class="cols">
+        <div class="box" data-pool>
+          <div class="row" style="justify-content: space-between">
+            <h3 class="cap">Sample pool · 80 blocks of 4 KB</h3>
+            <span class="num"><b id="usedKB">0</b> <span class="dim">of 320 KB</span></span>
+          </div>
+          <div class="map" id="map" aria-label="Sample pool map"></div>
+          <div class="legend">
+            <span><i style="background: var(--brk)"></i>BREAK</span>
+            <span><i style="background: var(--chop)"></i>LOOP</span>
+            <span><i style="background: var(--kit)"></i>KIT</span>
+            <span><i style="background: var(--chd)"></i>INSTRUMENT</span>
+            <span><i style="background: var(--mel)"></i>MELODY</span>
+            <span><i style="border: 1px solid var(--rule)"></i>free</span>
+            <span><i style="background: var(--wait)"></i>about to send</span>
+          </div>
+          <div class="row" style="justify-content: space-between">
+            <span class="num">Free room: <b id="freeTime">0 s</b> <span class="dim">of sound at</span></span>
+            <span class="seg" role="group" aria-label="Quality for the estimate" id="estSeg">
+              <button type="button" data-khz="22" aria-pressed="true">22 kHz</button>
+              <button type="button" data-khz="16" aria-pressed="false">16 kHz</button>
+              <button type="button" data-khz="11" aria-pressed="false">11 kHz</button>
+            </span>
+          </div>
+        </div>
+        <div class="box">
+          <div class="tablewrap">
+            <table class="pool num" id="poolTable">
+              <thead><tr><th>Name</th><th>Type</th><th class="r">kHz</th><th class="r">KB</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="dim" id="poolNote">Yellow: only on the FM-1 (sent from another computer). Read it back to keep a copy here.</p>
+          <p class="status" id="poolStatus" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="cols" style="margin-top: 16px">
+        <div class="box">
+          <h3>Add sounds</h3>
+          <div class="drop" id="drop"><b>Drop WAV files here</b> or <button class="btn small" type="button" id="open">Open…</button> <button class="btn small" type="button" id="newKit">New kit</button><br>The app tells a break from a loop, a kit hit or an instrument. Change it if it's wrong. Hits go on a kit's 16 pads.</div>
+          <input type="file" id="fileIn" multiple accept="audio/*,.wav,.aif,.aiff,.mp3,.flac,.m4a,.ogg">
+          <div id="files"></div>
+          <div class="row">
+            <button class="btn go" type="button" id="sendBtn" disabled>Send to the FM-1</button>
+            <span class="dim num" id="afterText"></span>
+          </div>
+          <div class="bar" aria-hidden="true" hidden id="sendBarBox"><i id="sendBar"></i></div>
+          <p class="status" id="sendStatus" aria-live="polite"></p>
+        </div>
+        <div class="box">
+          <h3>Set on the FM-1</h3>
+          <div class="set" id="set" data-pool></div>
+          <div class="row" data-pool>
+            <button class="btn" type="button" id="backup">Back up the set</button>
+            <button class="btn" type="button" id="restore">Restore…</button>
+          </div>
+          <input type="file" id="restoreFile" accept=".json,application/json">
+          <div class="bar" aria-hidden="true" hidden id="setBarBox"><i id="setBar"></i></div>
+          <p class="status" id="setStatus" aria-live="polite"></p>
+          <h3>Sound packs</h3>
+          <div class="packs" id="packs"></div>
+        </div>
+      </div>
+
+      <div class="box" style="margin-top: 16px" id="melBox">
+        <div class="row" style="justify-content: space-between">
+          <h3>Melodies · CHOP INST, MELODY MIDI</h3>
+          <span class="dim num" id="melCount"></span>
+        </div>
+        <p class="dim">8 bars of a MIDI file's tune. On the FM-1: the CHOP track in INST, MELODY on MIDI, THEME picks one. It plays in the song's key, fitted to its chords. Drop MIDI files here, or:</p>
+        <div class="row">
+          <button class="btn small" type="button" id="melOpen">Open MIDI…</button>
+          <button class="btn small" type="button" id="melPack">Add the Fookerton pack (56 tunes, CC0)</button>
+          <button class="btn small" type="button" id="melAll">All on</button>
+          <button class="btn small" type="button" id="melNone">All off</button>
+        </div>
+        <input type="file" id="melIn" multiple accept=".mid,.midi,audio/midi,audio/x-midi">
+        <div class="mels" id="melList"></div>
+        <div class="row">
+          <button class="btn go" type="button" id="melSend" disabled>Send the melodies to the FM-1</button>
+          <span class="dim num" id="melAfter"></span>
+        </div>
+        <div class="bar" aria-hidden="true" hidden id="melBarBox"><i id="melBar"></i></div>
+        <p class="status" id="melStatus" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Connecting the FM-1 needs Web MIDI: Chrome, Edge or Firefox on a computer, Chrome on Android. On Safari and iPhone the emulator and the library work.</p>
+    <p>More: <a href="webapp/editor/">the editor</a> (sounds and patterns from the computer) · <a href="https://github.com/ErnestoRebane" target="_blank" rel="noopener">source</a> · <span id="version"></span></p>
+    <p>FMX is GPL-3.0, no warranty, after SLOOP by isod89 and Felucca by Leo Kuroshita, Hügelton Instruments; the BREAK's generator after X0X by charlesvestal. Terminus font by Dimitar Toshkov Zhekov, SIL OFL 1.1.</p>
+    <p>M-VAVE and FM-1 are trademarks of their respective owners. FMX is not affiliated with or endorsed by them.</p>
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
