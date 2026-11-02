@@ -10,8 +10,8 @@
   packs/                      the sound packs (web/packs: tools/gen_packs.py), packs/melodies the MIDI tunes (melody.js)
   emu/                        the emulator: sloop.wasm from --emu DIR (web/emu/build.sh makes build/emu), worklet.js
   firmware/fmx-VER.fwsc       the package
-  webapp/editor/index.html    editor.html (+ fukiai.ttf, FUKIAI-LICENSE.txt)
-  webapp/installer, breaks, slice, emu   the old pages' addresses: each sends you to its part of the app
+  webapp/installer, breaks, slice, emu, editor   the old pages' addresses: each sends you to its part of the app
+                              (the legacy editor, web/editor.html, is not published: it is SLOOP's)
   src/                        not touched
 
   web/make_site.py build/felucca-X.Y.fwsc X.Y OUT_DIR [--emu DIR]
@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 BLOCKS, BLK, KEEP = 20, 0x30, 0x2F
 MODULES = ["app.js", "app_draw.js", "app_emu.js", "app_help.js", "app_device.js", "sounds.js", "melody.js", "pool.js", "breaks.js", "slice.js", "fm1ota.js", "fm1pkg.js"]
 FONTS = ["terminus-16.woff", "terminus-16-bold.woff", "terminus-12.woff", "terminus-32-bold.woff"]
-OLD = {"installer": "firmware", "breaks": "sounds", "slice": "sounds", "emu": "emulator"}   # an old page -> its part of the app
+OLD = {"installer": "firmware", "breaks": "sounds", "slice": "sounds", "emu": "emulator", "editor": "top"}   # an old page -> its part of the app
 
 
 def product_of(raw):
@@ -60,8 +60,8 @@ def main(pkg, version, out, emu=None):
         raise SystemExit("app.html must contain /*META*/null once; update make_site.py")
     html = html.replace("/*META*/null", meta)
 
-    fw, fonts, packs, emu_out, ed = out / "firmware", out / "fonts", out / "packs", out / "emu", out / "webapp" / "editor"
-    for d in (fw, fonts, packs, emu_out, ed):
+    fw, fonts, packs, emu_out = out / "firmware", out / "fonts", out / "packs", out / "emu"
+    for d in (fw, fonts, packs, emu_out):
         d.mkdir(parents=True, exist_ok=True)
     (out / "index.html").write_text(html, encoding="utf-8")
     for f in MODULES:
@@ -86,10 +86,6 @@ def main(pkg, version, out, emu=None):
     for old in list(fw.glob("felucca-*.fwsc")) + list(fw.glob("sloop-*.fwsc")) + list(fw.glob("fmx-*.fwsc")):
         old.unlink()                                # one package: the current one
     shutil.copy(pkg, fw / name)
-    shutil.copy(HERE / "editor.html", ed / "index.html")
-    for f in ("fukiai.ttf", "FUKIAI-LICENSE.txt"):
-        if (HERE / f).exists():
-            shutil.copy(HERE / f, ed / f)
     for page, part in OLD.items():                  # the old pages: their files gone, their address kept
         d = out / "webapp" / page
         if d.exists():
@@ -97,7 +93,7 @@ def main(pkg, version, out, emu=None):
         d.mkdir(parents=True)
         (d / "index.html").write_text(redirect(part), encoding="utf-8")
     print(f"site: {out}: index.html ({len(html)} B, the app), emu/{'sloop.wasm' if wasm and wasm.exists() else '(none)'}, "
-          f"webapp/editor, firmware/{name} ({len(raw)} B, {product})")
+          f"firmware/{name} ({len(raw)} B, {product})")
 
 
 if __name__ == "__main__":
